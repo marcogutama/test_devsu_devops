@@ -1,0 +1,57 @@
+# Dependabot configuration para mantener dependencias actualizadas
+# Documentación: https://docs.github.com/en/code-security/dependabot
+
+version: 2
+updates:
+  # Actualizar dependencias de Maven
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "tu-usuario-github"
+    labels:
+      - "dependencies"
+      - "java"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    ignore:
+      # Ignorar actualizaciones de versiones mayores (breaking changes)
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  
+  # Actualizar GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "tu-usuario-github"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+  
+  # Actualizar Dockerfile
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "tu-usuario-github"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "build"

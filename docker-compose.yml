@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: devsu-demo-app:latest
+    container_name: devsu-demo-app
+    
+    # Variables de entorno
+    environment:
+      - PORT=8000
+      - JAVA_OPTS=-Xmx512m -Xms256m
+      - SPRING_PROFILES_ACTIVE=prod
+      - NAME_DB=jdbc:h2:file:/app/data/test
+      - USERNAME_DB=user
+      - PASSWORD_DB=password
+      - TZ=America/Guayaquil
+    
+    # Mapeo de puertos
+    ports:
+      - "8000:8000"
+    
+    # Volumen para persistencia de base de datos H2
+    volumes:
+      - h2-data:/app/data
+    
+    # Reinicio automático
+    restart: unless-stopped
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/actuator/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+    
+    # Límites de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Red
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  h2-data:
+    driver: local
