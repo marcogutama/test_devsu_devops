@@ -1,6 +1,6 @@
 # Dockerfile multi-stage para aplicación Spring Boot
 # Etapa 1: Build
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
+FROM maven:3.9.11-eclipse-temurin-25-alpine AS builder
 
 # Establecer directorio de trabajo
 WORKDIR /app
