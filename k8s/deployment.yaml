@@ -1,0 +1,154 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devsu-demo-app
+  namespace: devsu-demo
+  labels:
+    app: devsu-demo-app
+    version: v1
+spec:
+  # Mínimo 2 réplicas para alta disponibilidad
+  replicas: 3
+  
+  # Estrategia de actualización rolling
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # Permite 1 pod extra durante actualización
+      maxUnavailable: 1  # Permite que 1 pod esté indisponible
+  
+  # Selector de pods
+  selector:
+    matchLabels:
+      app: devsu-demo-app
+  
+  # Template del pod
+  template:
+    metadata:
+      labels:
+        app: devsu-demo-app
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/api/actuator/prometheus"
+    
+    spec:
+      # Service Account (opcional, para RBAC)
+      serviceAccountName: default
+      
+      # Security context a nivel de pod
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      # Contenedores
+      containers:
+      - name: devsu-demo-app
+        image: mgutama/devsu-demo-app:latest  # Reemplazar con tu imagen
+        imagePullPolicy: Always
+        
+        # Puerto del contenedor
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        
+        # Variables de entorno desde ConfigMap
+        envFrom:
+        - configMapRef:
+            name: devsu-app-config
+        
+        # Variables de entorno desde Secret
+        env:
+        - name: USERNAME_DB
+          valueFrom:
+            secretKeyRef:
+              name: devsu-app-secret
+              key: USERNAME_DB
+        - name: PASSWORD_DB
+          valueFrom:
+            secretKeyRef:
+              name: devsu-app-secret
+              key: PASSWORD_DB
+        
+        # Recursos garantizados y límites
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        
+        # Liveness Probe - verifica que el contenedor está vivo
+        livenessProbe:
+          httpGet:
+            path: /api/actuator/health/liveness
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Readiness Probe - verifica que el contenedor está listo para recibir tráfico
+        readinessProbe:
+          httpGet:
+            path: /api/actuator/health/readiness
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Startup Probe - para aplicaciones que tardan en iniciar
+        startupProbe:
+          httpGet:
+            path: /api/actuator/health
+            port: http
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30  # 5 minutos máximo (30 * 10s)
+        
+        # Volumen para persistencia de datos H2 (comentado para modo memoria)
+        # volumeMounts:
+        # - name: h2-data
+        #   mountPath: /app/data
+        
+        # Security context a nivel de contenedor
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # H2 necesita escribir
+          capabilities:
+            drop:
+            - ALL
+      
+      # Volúmenes (comentado - no necesario para H2 en memoria)
+      # volumes:
+      # - name: h2-data
+      #   persistentVolumeClaim:
+      #     claimName: devsu-app-pvc
+      
+      # Image pull secrets (si la imagen es privada)
+      # imagePullSecrets:
+      # - name: docker-registry-secret
+      
+      # Tolerancias y afinidad (opcional, para producción)
+      affinity:
+        # Anti-afinidad de pods - no poner múltiples réplicas en el mismo nodo
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - devsu-demo-app
+              topologyKey: kubernetes.io/hostname

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devsu-demo
+  labels:
+    name: devsu-demo
+    environment: production
+    app: devsu-demo-app

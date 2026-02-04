@@ -1,0 +1,62 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: devsu-demo-app-ingress
+  namespace: devsu-demo
+  labels:
+    app: devsu-demo-app
+  annotations:
+    # Anotaciones para nginx ingress controller
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"  # Para desarrollo local
+    
+    # Límites de tasa (rate limiting)
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # CORS (opcional)
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    
+    # Health checks
+    nginx.ingress.kubernetes.io/health-check-path: "/api/actuator/health"
+    nginx.ingress.kubernetes.io/health-check-interval: "30s"
+spec:
+  # Ingress class (nginx para Minikube)
+  ingressClassName: nginx
+  
+  # Reglas de enrutamiento
+  rules:
+  
+  # Regla para hostname local
+  - host: devsu-demo.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: devsu-demo-app
+            port:
+              number: 8000
+  
+  # Regla sin hostname (acceso por IP)
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: devsu-demo-app
+            port:
+              number: 8000
+  
+  # TLS (opcional, para HTTPS)
+  # tls:
+  # - hosts:
+  #   - devsu-demo.local
+  #   secretName: devsu-demo-tls

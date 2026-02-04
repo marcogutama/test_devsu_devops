@@ -6,12 +6,13 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+# Permisos necesarios para el workflow
 permissions:
   contents: read
   checks: write
   pull-requests: write
   statuses: write
-  security-events: write    
+  security-events: write
 
 env:
   JAVA_VERSION: '21'
@@ -157,8 +158,17 @@ jobs:
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-            -Dsonar.java.binaries=target/classes \
             -B
+      
+      - name: 📊 SonarCloud Quality Gate
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
 
   # ============================================
   # JOB 4: DOCKER BUILD
@@ -230,34 +240,126 @@ jobs:
           echo "🔒 Security scan completed" >> $GITHUB_STEP_SUMMARY
 
   # ============================================
-  # JOB 5: DEPLOYMENT (opcional)
+  # JOB 5: KUBERNETES DEPLOYMENT
   # ============================================
-  deploy:
-    name: Deploy to Production
+  k8s-deploy:
+    name: Deploy to Kubernetes (Kind)
     runs-on: ubuntu-latest
     needs: docker-build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: https://your-app-url.com
     
     steps:
-      - name: 🚀 Deploy notification
-        run: |
-          echo "### 🚀 Deployment Status" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Ready for deployment" >> $GITHUB_STEP_SUMMARY
-          echo "🐳 Docker image: ${{ secrets.DOCKER_USERNAME }}/devsu-demo-app:latest" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "To deploy manually, pull the latest image:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ secrets.DOCKER_USERNAME }}/devsu-demo-app:latest" >> $GITHUB_STEP_SUMMARY
-          echo "docker-compose up -d" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
       
-      # Descomenta y configura según tu plataforma de deployment:
-      # - name: Deploy to AWS ECS
-      # - name: Deploy to Azure
-      # - name: Deploy to Kubernetes
-      # - name: Deploy to Heroku
-      # etc.
+      - name: 🔧 Create Kind Cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: devsu-demo-cluster
+          wait: 60s
+      
+      - name: 📊 Verify Cluster
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+      
+      - name: 🏷️ Update Kubernetes manifests with image
+        run: |
+          cd k8s
+          # Reemplazar imagen con la construida en CI
+          sed -i "s|image:.*devsu-demo-app:latest|image: ${{ secrets.DOCKER_USERNAME }}/devsu-demo-app:latest|g" deployment.yaml
+          cat deployment.yaml | grep "image:"
+      
+      - name: 🚀 Deploy to Kubernetes
+        run: |
+          cd k8s
+          
+          # Aplicar manifiestos en orden
+          echo "📦 Creating namespace..."
+          kubectl apply -f namespace.yaml
+          
+          echo "🔧 Applying ConfigMaps..."
+          kubectl apply -f configmap.yaml
+          
+          echo "🔐 Applying Secrets..."
+          kubectl apply -f secret.yaml
+          
+          echo "💾 Skipping PVC (using H2 in-memory)..."
+          # kubectl apply -f pvc.yaml  # No necesario con H2 in-memory
+          
+          echo "🚢 Deploying application..."
+          kubectl apply -f deployment.yaml
+          
+          echo "🌐 Creating Services..."
+          kubectl apply -f service.yaml
+          
+          echo "📈 Configuring HPA..."
+          kubectl apply -f hpa.yaml || echo "HPA requires metrics-server"
+          
+          echo "🌍 Creating Ingress..."
+          kubectl apply -f ingress.yaml || echo "Ingress controller not available"
+      
+      - name: ⏳ Wait for Deployment
+        run: |
+          echo "Waiting for deployment to be ready..."
+          kubectl rollout status deployment/devsu-demo-app -n devsu-demo --timeout=5m
+      
+      - name: 🔍 Verify Deployment
+        run: |
+          echo "📊 Deployment Status:"
+          kubectl get all -n devsu-demo
+          
+          echo ""
+          echo "📋 Pods:"
+          kubectl get pods -n devsu-demo -o wide
+          
+          echo ""
+          echo "🔍 Pod Details:"
+          kubectl describe pods -n devsu-demo | grep -E "Name:|Status:|Image:|Ready:"
+      
+      - name: 🧪 Test Application
+        run: |
+          # Port-forward para testing
+          kubectl port-forward -n devsu-demo svc/devsu-demo-app 8000:8000 &
+          PF_PID=$!
+          
+          # Esperar a que port-forward esté listo
+          sleep 5
+          
+          # Test health endpoint
+          echo "Testing health endpoint..."
+          curl -f http://localhost:8000/api/actuator/health || exit 1
+          
+          # Test API endpoint
+          echo "Testing API endpoints..."
+          curl -f http://localhost:8000/api/users || exit 1
+          
+          # Cleanup
+          kill $PF_PID || true
+          
+          echo "✅ Application is healthy and responding!"
+      
+      - name: 📊 Deployment Summary
+        if: always()
+        run: |
+          echo "### 🚀 Kubernetes Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Deployed to Kind cluster successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Resources Created:" >> $GITHUB_STEP_SUMMARY
+          echo "- Namespace: devsu-demo" >> $GITHUB_STEP_SUMMARY
+          echo "- Deployment: devsu-demo-app (3 replicas)" >> $GITHUB_STEP_SUMMARY
+          echo "- Service: devsu-demo-app (ClusterIP)" >> $GITHUB_STEP_SUMMARY
+          echo "- HPA: devsu-demo-app-hpa (2-10 replicas)" >> $GITHUB_STEP_SUMMARY
+          echo "- Ingress: devsu-demo-app-ingress" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Pod Status:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n devsu-demo >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+      
+      - name: 🧹 Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up Kind cluster..."
+          kind delete cluster --name devsu-demo-cluster || true

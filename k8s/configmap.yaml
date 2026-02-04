@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devsu-app-config
+  namespace: devsu-demo
+  labels:
+    app: devsu-demo-app
+data:
+  # Configuración de la aplicación
+  PORT: "8000"
+  SPRING_PROFILES_ACTIVE: "prod"
+  TZ: "America/Guayaquil"
+  
+  # Configuración de Java
+  JAVA_OPTS: "-Xmx512m -Xms256m"
+  
+  # Configuración de base de datos H2 (modo memoria para K8s)
+  NAME_DB: "jdbc:h2:mem:devsudb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+  
+  # Configuración de logging
+  LOG_LEVEL: "INFO"
+  
+  # application.properties adicional (opcional)
+  application.properties: |
+    server.port=${PORT:8000}
+    server.servlet.context-path=/api
+    spring.profiles.active=${SPRING_PROFILES_ACTIVE:prod}
+    
+    # Database
+    spring.datasource.url=${NAME_DB:jdbc:h2:file:/app/data/test}
+    spring.datasource.driverClassName=org.h2.Driver
+    spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+    
+    # Actuator
+    management.endpoints.web.exposure.include=health,info,metrics,prometheus
+    management.endpoint.health.show-details=when-authorized
+    management.health.livenessState.enabled=true
+    management.health.readinessState.enabled=true
+    
+    # Logging
+    logging.level.root=${LOG_LEVEL:INFO}
+    logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} - %msg%n
