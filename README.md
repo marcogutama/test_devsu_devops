@@ -803,7 +803,7 @@ chmod +x setup-minikube.sh
 # 2. Desplegar aplicación
 chmod +x deploy-to-minikube.sh
 ./deploy-to-minikube.sh
-# Cuando pregunte: ingresar tu usuario de Docker Hub
+# Cuando pregunte: ingresar usuario de Docker Hub (mgutama)
 
 # 3. Acceder a la aplicación
 minikube service devsu-demo-app-nodeport -n devsu-demo
@@ -943,16 +943,16 @@ curl http://localhost:8000/api/users/1
 
 ### Objetivos Cumplidos
 
-✅ **Dockerización completa** con multi-stage builds y optimizaciones
-✅ **Pipeline CI/CD** con 5 stages (Build, Test, Coverage, Analysis, Deploy)
-✅ **Kubernetes deployment** con 3 réplicas y auto-scaling
-✅ **ConfigMaps y Secrets** para configuración externalizada
-✅ **Ingress** configurado con Nginx
-✅ **Health checks** completos (Liveness, Readiness, Startup)
-✅ **Security scanning** con Trivy
-✅ **Code coverage** >50% con JaCoCo
-✅ **Static analysis** con SonarCloud
-✅ **Documentación completa** con diagramas
+- ✅ **Dockerización completa** con multi-stage builds y optimizaciones
+- ✅ **Pipeline CI/CD** con 5 stages (Build, Test, Coverage, Analysis, Deploy)
+- ✅ **Kubernetes deployment** con 3 réplicas y auto-scaling
+- ✅ **ConfigMaps y Secrets** para configuración externalizada
+- ✅ **Ingress** configurado con Nginx
+- ✅ **Health checks** completos (Liveness, Readiness, Startup)
+- ✅ **Security scanning** con Trivy
+- ✅ **Code coverage** >50% con JaCoCo
+- ✅ **Static analysis** con SonarCloud
+- ✅ **Documentación completa** con diagramas
 
 ### Métricas del Proyecto
 
@@ -989,10 +989,10 @@ curl http://localhost:8000/api/users/1
 
 ## 📞 Información de Contacto
 
-**Autor**: [Tu Nombre]  
-**Email**: [tu-email@example.com]  
-**LinkedIn**: [linkedin.com/in/tu-perfil]  
-**GitHub**: [github.com/tu-usuario]
+**Autor**: Marco Gutama 
+**Email**: paul.gutama@gmail.com  
+**LinkedIn**: https://www.linkedin.com/in/marcogutama/
+**GitHub**: https://github.com/marcogutama
 
 ---
 
